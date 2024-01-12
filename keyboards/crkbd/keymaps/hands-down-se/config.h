@@ -29,7 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // #define EE_HANDS
 
 //#define QUICK_TAP_TERM 0
-//#define TAPPING_TERM 100
+#define COMBO_MUST_TAP_PER_COMBO
+#define COMBO_ONLY_FROM_LAYER 0
+
+#define COMBO_TERM 40
+#define TAPPING_TERM 220
 
 #ifdef RGBLIGHT_ENABLE
     #define RGBLIGHT_EFFECT_BREATHING

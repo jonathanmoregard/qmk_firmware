@@ -1,0 +1,26 @@
+  KC_W,KC_F                                   LCTL(KC_Z)
+  KC_W,KC_L                                   LCTL(KC_X)
+  KC_F,KC_L                                   LCTL(KC_C)
+  KC_L,KC_D                                   LCTL(KC_V)
+  KC_F,KC_D                                   LCTL(KC_A)
+  KC_W,KC_F,KC_L                              LCTL(KC_Y)
+  KC_G,KC_M                                   M0
+  LCTL_T(KC_N),LSFT_T(KC_T)                   M1
+  LGUI_T(KC_C),LSFT_T(KC_T)                   M2
+  LALT_T(KC_S),LCTL_T(KC_N)                   M3
+  KC_W,KC_D                                   M4
+  KC_M,KC_P                                   M5
+  KC_COMMA,KC_DOT                             LSFT(KC_8)
+  KC_DOT,LSFT(KC_DOT)                         LSFT(KC_9)
+  KC_U,KC_O                                   RALT(KC_8)
+  KC_O,KC_Y                                   RALT(KC_9)
+  KC_COMMA,LSFT(KC_DOT)                       KC_SLASH
+  LSFT(KC_DOT),KC_COMMA,KC_DOT                LSFT(KC_BSLASH)
+  KC_U,KC_Y,KC_O                              LSFT(KC_SLASH)
+  KC_Y,KC_U                                   LSFT(KC_6)
+  RSFT_T(KC_A),KC_DOT,RALT_T(KC_I)            DF(2)
+  LALT_T(KC_S),LCTL_T(KC_N),LSFT_T(KC_T)      DF(0)
+  RSFT_T(KC_A),RCTL_T(KC_E),RALT_T(KC_I)      DF(3)
+  RALT_T(KC_I),RCTL_T(KC_E)                   KC_ENTER
+  RSFT_T(KC_A),RALT_T(KC_I)                   KC_TAB
+  KC_LBRACKET ,RCTL_T(KC_E)                   RALT(KC_2)
