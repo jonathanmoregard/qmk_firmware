@@ -145,8 +145,16 @@ combo_t key_combos[] = {
 };
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    void send_h_bigram(uint16_t keycode) {
+        if (is_caps_word_on()){
+            tap_code16(LSFT(keycode));
+            tap_code16(LSFT(KC_H));
+        } else {
+            tap_code(keycode);
+            SEND_STRING(SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+        }
+    }
     if (!process_custom_shift_keys(keycode, record)) { return false; }
-
     switch (keycode) {
     case CKC_E_SL:
         if (!record->tap.count && record->event.pressed) {
@@ -179,42 +187,42 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false; // Skip further processing of this key
     case CKC_GH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_G) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_G);
         } else {
 
         }
         break;
     case CKC_TH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_T) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_T);
         } else {
 
         }
         break;
     case CKC_CH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_C) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_C);
         } else {
 
         }
         break;
     case CKC_SH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_S) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_S);
         } else {
 
         }
         break;
     case CKC_WH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_W) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_W);
         } else {
 
         }
         break;
     case CKC_PH:
         if (record->event.pressed) {
-            SEND_STRING(SS_TAP(X_P) SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+            send_h_bigram(KC_P);
         } else {
 
         }
@@ -239,6 +247,30 @@ bool get_combo_must_tap(uint16_t index, combo_t *combo) {
     }
     return false;
 
+}
+
+bool caps_word_press_user(uint16_t keycode) {
+    switch (keycode) {
+        // Keycodes that continue Caps Word, with shift applied.
+        case KC_A ... KC_Z:
+        case SE_ODIA:
+        case SE_ADIA:
+        case SE_ARNG:
+        case KC_MINS:
+        case CKC_GH ... CKC_PH:
+            add_weak_mods(MOD_BIT(KC_LSFT));  // Apply shift to next key.
+            return true;
+
+        // Keycodes that continue Caps Word, without shifting.
+        case KC_1 ... KC_0:
+        case KC_BSPC:
+        case KC_DEL:
+        case KC_UNDS:
+            return true;
+
+        default:
+            return false;  // Deactivate Caps Word.
+    }
 }
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -287,3 +319,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
                                                                 //`--------------------------------------------'  `--------------------------------------------'
   )
 };
+
+#define IDLE_TIMEOUT_MS 5000  // Idle timeout in milliseconds.
+
+static uint32_t idle_callback(uint32_t trigger_time, void* cb_arg) {
+  // If execution reaches here, the keyboard has gone idle.
+  layer_move(0);
+  return 0;
+}
