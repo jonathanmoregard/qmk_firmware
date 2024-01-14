@@ -34,7 +34,7 @@ const custom_shift_key_t custom_shift_keys[] = {
     {KC_COMMA, LSFT(KC_1)},
     {KC_DOT, LSFT(KC_MINUS)},
     {LSFT(KC_DOT), LSFT(KC_COMMA)},
-    {KC_BACKSLASH, LSFT(KC_2)},
+    {KC_NONUS_HASH, LSFT(KC_2)},
     {MT_ESC_SLASH, RALT(KC_MINUS)},
     {LSFT(KC_SLASH), RALT(KC_4)},
     {KC_SLASH, KC_MINUS},
