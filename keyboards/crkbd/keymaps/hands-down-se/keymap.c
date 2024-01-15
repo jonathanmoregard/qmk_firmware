@@ -136,15 +136,31 @@ combo_t key_combos[] = {
     [COMBO_ASTERISK] = COMBO(combo_asterisk, SE_ASTR),
     [COMBO_UNDERSCORE] = COMBO(combo_underscore, SE_UNDS),
     [COMBO_AMPERSAND] = COMBO(combo_ampersand, SE_AMPR),
-    [COMBO_LAYER_NAV] = COMBO(combo_layer_nav, DF(2)),
-    [COMBO_LAYER_HOME] = COMBO(combo_layer_home, DF(0)),
-    [COMBO_LAYER_MOUSE] = COMBO(combo_layer_mouse, DF(3)),
+    [COMBO_LAYER_NAV] = COMBO(combo_layer_nav, TO(2)),
+    [COMBO_LAYER_HOME] = COMBO(combo_layer_home, TO(0)),
+    [COMBO_LAYER_MOUSE] = COMBO(combo_layer_mouse, TO(3)),
     [COMBO_ENTER] = COMBO(combo_enter, KC_ENTER),
     [COMBO_TAB] = COMBO(combo_tab, KC_TAB),
     [COMBO_AT] = COMBO(combo_at, SE_AT)
 };
 
+#define IDLE_TIMEOUT_MS 5000  // Idle timeout in milliseconds.
+
+static uint32_t idle_callback(uint32_t trigger_time, void* cb_arg) {
+  // If execution reaches here, the keyboard has gone idle.
+  layer_clear(DF);
+  return 0;
+}
+// TODO not working
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // On every key event, start or extend the deferred execution to call
+    // `idle_callback()` after IDLE_TIMEOUT_MS.
+    static deferred_token idle_token = INVALID_DEFERRED_TOKEN;
+    if (!extend_deferred_exec(idle_token, IDLE_TIMEOUT_MS)) {
+        idle_token = defer_exec(IDLE_TIMEOUT_MS, idle_callback, NULL);
+    }
+
     void send_h_bigram(uint16_t keycode) {
         if (is_caps_word_on()){
             tap_code16(LSFT(keycode));
@@ -266,6 +282,7 @@ bool caps_word_press_user(uint16_t keycode) {
         case KC_BSPC:
         case KC_DEL:
         case KC_UNDS:
+        case SE_UNDS:
             return true;
 
         default:
@@ -319,11 +336,3 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
                                                                 //`--------------------------------------------'  `--------------------------------------------'
   )
 };
-
-#define IDLE_TIMEOUT_MS 5000  // Idle timeout in milliseconds.
-
-static uint32_t idle_callback(uint32_t trigger_time, void* cb_arg) {
-  // If execution reaches here, the keyboard has gone idle.
-  layer_move(0);
-  return 0;
-}
