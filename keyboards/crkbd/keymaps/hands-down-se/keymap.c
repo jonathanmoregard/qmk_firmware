@@ -144,11 +144,11 @@ combo_t key_combos[] = {
     [COMBO_AT] = COMBO(combo_at, SE_AT)
 };
 
-#define IDLE_TIMEOUT_MS 5000  // Idle timeout in milliseconds.
+#define IDLE_TIMEOUT_MS 60000  // Idle timeout in milliseconds.
 
 static uint32_t idle_callback(uint32_t trigger_time, void* cb_arg) {
   // If execution reaches here, the keyboard has gone idle.
-  layer_clear(DF);
+  layer_clear();
   return 0;
 }
 // TODO not working
