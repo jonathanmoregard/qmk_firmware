@@ -161,6 +161,31 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         idle_token = defer_exec(IDLE_TIMEOUT_MS, idle_callback, NULL);
     }
 
+    // Strip mod-tap or layer-tap functionality to get the base keycode
+    uint16_t base_keycode = keycode;
+    if (keycode >= QK_MOD_TAP && keycode <= QK_MOD_TAP_MAX) {
+        base_keycode &= 0xFF; // Strip the mod-tap part, leaving the keycode
+    } else if (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) {
+        base_keycode &= 0xFF; // Strip the layer-tap part, leaving the keycode
+    }
+
+    // Now base_keycode holds the keycode without mod-tap or layer-tap functionality
+    if (record->event.pressed) {
+        //Go to base layer if char is typed
+        switch (base_keycode) {
+            case KC_A ... KC_Z:
+            case SE_ODIA:
+            case SE_ADIA:
+            case SE_ARNG:
+            case KC_MINS:
+            case CKC_GH ... CKC_PH:
+            case KC_1 ... KC_0:
+            case KC_UNDS:
+            case SE_UNDS:
+                layer_clear();
+        }
+    }
+
     void send_h_bigram(uint16_t keycode) {
         if (is_caps_word_on()){
             tap_code16(LSFT(keycode));
