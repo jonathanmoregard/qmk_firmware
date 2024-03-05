@@ -32,19 +32,20 @@ enum custom_keycodes {
 };
 
 const custom_shift_key_t custom_shift_keys[] = {
-    {KC_COMMA,  SE_EXLM},
-    {KC_DOT,    SE_QUES},
-    {SE_COLN,   SE_SCLN},
-    {SE_QUOT,   SE_DQUO},
-    {SE_UNDS,   SE_DLR},
-    {SE_MINS,   SE_PLUS},
-    {SE_LPRN,   SE_LCBR},
-    {SE_RPRN,   SE_RCBR},
-    {SE_LBRC,   SE_LABK},
-    {SE_RBRC,   SE_RABK},
-    {SE_ASTR,   SE_HASH},
-    {CKC_C_BSP, KC_DELETE},
-    {CKC_E_SL,  SE_BSLS}
+    {KC_COMMA,  SE_EXLM}, // , !
+    {KC_DOT,    SE_QUES}, // . ?
+    {SE_SCLN,   SE_COLN}, // ; :
+    {SE_QUOT,   SE_DQUO}, // ' "
+    {SE_MINS,   SE_PLUS}, // - +
+    {SE_LPRN,   SE_LCBR}, // ( {
+    {SE_RPRN,   SE_RCBR}, // ) }
+    {SE_LBRC,   SE_LABK}, // [ <
+    {SE_RBRC,   SE_RABK}, // ] >
+    {SE_ASTR,   SE_HASH}, // * #
+    {SE_UNDS,   SE_PIPE}, // _ |
+    {SE_AMPR,   SE_DLR},  // & $
+    {CKC_C_BSP, KC_DELETE}, // backspace delete
+    {CKC_E_SL,  SE_BSLS} // slash backslash
 };
 
 uint8_t NUM_CUSTOM_SHIFT_KEYS =
@@ -98,11 +99,11 @@ const uint16_t PROGMEM combo_sh[] = {LALT_T(KC_S), LCTL_T(KC_N), COMBO_END};
 const uint16_t PROGMEM combo_wh[] = {KC_W, KC_D, COMBO_END};
 const uint16_t PROGMEM combo_ph[] = {KC_M, KC_P, COMBO_END};
 const uint16_t PROGMEM combo_b_paren[] = {KC_COMMA, KC_DOT, COMBO_END};
-const uint16_t PROGMEM combo_e_paren[] = {KC_DOT, LSFT(KC_DOT), COMBO_END};
+const uint16_t PROGMEM combo_e_paren[] = {KC_DOT, SE_SCLN, COMBO_END};
 const uint16_t PROGMEM combo_b_bracket[] = {KC_U, KC_O, COMBO_END};
 const uint16_t PROGMEM combo_e_bracket[] = {KC_O, KC_Y, COMBO_END};
-const uint16_t PROGMEM combo_minus[] = {KC_COMMA, LSFT(KC_DOT), COMBO_END};
-const uint16_t PROGMEM combo_asterisk[] = {LSFT(KC_DOT), KC_COMMA, KC_DOT, COMBO_END};
+const uint16_t PROGMEM combo_minus[] = {KC_COMMA, SE_SCLN, COMBO_END};
+const uint16_t PROGMEM combo_asterisk[] = {SE_SCLN, KC_COMMA, KC_DOT, COMBO_END};
 const uint16_t PROGMEM combo_underscore[] = {KC_U, KC_Y, KC_O, COMBO_END};
 const uint16_t PROGMEM combo_ampersand[] = {KC_Y, KC_U, COMBO_END};
 const uint16_t PROGMEM combo_layer_nav[] = {RSFT_T(KC_A), KC_DOT, RALT_T(KC_I), COMBO_END};
@@ -316,7 +317,7 @@ bool caps_word_press_user(uint16_t keycode) {
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [0] = LAYOUT_split_3x6_3(
   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
-             KC_VOLU,          KC_X,          KC_G,           KC_M,          KC_P,          KC_J,                                        SE_QUOT,      KC_COMMA,        KC_DOT,   LSFT(KC_DOT),      CKC_E_SL,       KC_BRIU,
+             KC_VOLU,          KC_X,          KC_G,           KC_M,          KC_P,          KC_J,                                        SE_QUOT,      KC_COMMA,        KC_DOT,        SE_SCLN,      CKC_E_SL,       KC_BRIU,
   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
              KC_MUTE,  LGUI_T(KC_C),  LALT_T(KC_S),   LCTL_T(KC_N),  LSFT_T(KC_T),          KC_K,                                        KC_LBRC,  RSFT_T(KC_A),  RCTL_T(KC_E),   RALT_T(KC_I), RGUI_T(KC_H),KC_PRINT_SCREEN,
   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
