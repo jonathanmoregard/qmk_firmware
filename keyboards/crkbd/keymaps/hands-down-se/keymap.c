@@ -32,20 +32,28 @@ enum custom_keycodes {
 };
 
 const custom_shift_key_t custom_shift_keys[] = {
+    //single keys
     {KC_COMMA,  SE_EXLM}, // , !
     {KC_DOT,    SE_QUES}, // . ?
     {SE_SCLN,   SE_COLN}, // ; :
     {SE_QUOT,   SE_DQUO}, // ' "
+    {CKC_E_SL,  SE_BSLS}, // slash backslash
+    {CKC_C_BSP, KC_DELETE}, // backspace delete
+
+    // top row combos
     {SE_MINS,   SE_PLUS}, // - +
+    {SE_ASTR,   SE_HASH}, // * #
     {SE_LPRN,   SE_LCBR}, // ( {
     {SE_RPRN,   SE_RCBR}, // ) }
-    {SE_LBRC,   SE_LABK}, // [ <
-    {SE_RBRC,   SE_RABK}, // ] >
-    {SE_ASTR,   SE_HASH}, // * #
-    {SE_UNDS,   SE_PIPE}, // _ |
+
+    // middle row combos
+    {KC_ENTER,   SE_EQL}, // ENTER =
+
+    // bottom row combos
     {SE_AMPR,   SE_DLR},  // & $
-    {CKC_C_BSP, KC_DELETE}, // backspace delete
-    {CKC_E_SL,  SE_BSLS} // slash backslash
+    {SE_UNDS,   SE_PIPE}, // _ |
+    {SE_LBRC,   SE_LABK}, // [ <
+    {SE_RBRC,   SE_RABK} // ] >
 };
 
 uint8_t NUM_CUSTOM_SHIFT_KEYS =
@@ -166,6 +174,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         //Go to base layer if char is typed
         switch (keycode) {
             case KC_A ... KC_Z:
+            case KC_R:
             case LGUI_T(KC_C):
             case LALT_T(KC_S):
             case LCTL_T(KC_N):
@@ -228,43 +237,31 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     case CKC_GH:
         if (record->event.pressed) {
             send_h_bigram(KC_G);
-        } else {
-
         }
         break;
     case CKC_TH:
         if (record->event.pressed) {
             send_h_bigram(KC_T);
-        } else {
-
         }
         break;
     case CKC_CH:
         if (record->event.pressed) {
             send_h_bigram(KC_C);
-        } else {
-
         }
         break;
     case CKC_SH:
         if (record->event.pressed) {
             send_h_bigram(KC_S);
-        } else {
-
         }
         break;
     case CKC_WH:
         if (record->event.pressed) {
             send_h_bigram(KC_W);
-        } else {
-
         }
         break;
     case CKC_PH:
         if (record->event.pressed) {
             send_h_bigram(KC_P);
-        } else {
-
         }
         break;
     }
