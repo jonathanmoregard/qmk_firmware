@@ -193,16 +193,21 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!process_custom_shift_keys(keycode, record)) {
         return false;
     }
+
+    static uint16_t timer;
+
     switch (keycode) {
         case CKC_E_SL:
-            if (!record->tap.count && record->event.pressed) {
-                // Intercept tap function
-                tap_code16(SE_SLSH);
-            } else if (record->event.pressed) {
-                // Intercept hold function
-                tap_code(KC_ESC);
+            if (record->event.pressed) {
+                timer = timer_read();
+                tap_code(KC_ESC); // Change the key to be held here
+            } else {
+                tap_code(KC_ESC); // Change the key that was held here, too!
+                if (timer_elapsed(timer) < TAPPING_TERM) {
+                    tap_code16(SE_SLSH); // Change the character(s) to be sent on tap here
+                }
             }
-            return false;
+            return false; // We handled this keypress
         case CKC_C_BSP:
             // Check if c Control is held down
             if (get_mods() & (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_CTRL))) {
