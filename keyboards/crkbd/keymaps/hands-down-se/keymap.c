@@ -148,7 +148,6 @@ static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     layer_clear();
     return 0;
 }
-// TODO not working
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // On every key event, start or extend the deferred execution to call
