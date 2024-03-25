@@ -158,9 +158,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->tap.count == 1 && !record->event.pressed) {
-        // Go to base layer if char is typed
+        // Go to base layer if modtap char is typed
         switch (keycode) {
-            case KC_A ... KC_Z:
             case LGUI_T(KC_C):
             case LALT_T(KC_S):
             case LCTL_T(KC_N):
@@ -169,6 +168,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case RCTL_T(KC_E):
             case RALT_T(KC_I):
             case RGUI_T(KC_H):
+                layer_clear();
+        }
+    }
+
+    if (record->event.pressed) {
+        // Go to base layer if char is typed
+        switch (keycode) {
+            case KC_A ... KC_Z:
             case SE_ODIA:
             case SE_ADIA:
             case SE_ARNG:
