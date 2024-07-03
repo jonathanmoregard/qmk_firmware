@@ -38,7 +38,7 @@ const custom_shift_key_t custom_shift_keys[] = {
     {SE_RPRN, SE_RCBR}, // ) }
 
     // middle row combos
-    {SE_AT, SE_EQL}, // ENTER =
+    {SE_AT, SE_EQL}, // @ =
 
     // bottom row combos
     {SE_AMPR, SE_DLR},  // & $
@@ -65,6 +65,7 @@ enum combos {
     COMBO_SH,
     COMBO_WH,
     COMBO_PH,
+    COMBO_PERCENT,
     COMBO_B_PAREN,
     COMBO_E_PAREN,
     COMBO_B_BRACKET,
@@ -96,6 +97,7 @@ const uint16_t PROGMEM combo_ch[]          = {LGUI_T(KC_C), LSFT_T(KC_T), COMBO_
 const uint16_t PROGMEM combo_sh[]          = {LALT_T(KC_S), LCTL_T(KC_N), COMBO_END};
 const uint16_t PROGMEM combo_wh[]          = {KC_W, KC_D, COMBO_END};
 const uint16_t PROGMEM combo_ph[]          = {KC_M, KC_P, COMBO_END};
+const uint16_t PROGMEM combo_percent[]     = {SE_QUOT, KC_DOT, COMBO_END};
 const uint16_t PROGMEM combo_b_paren[]     = {KC_COMMA, KC_DOT, COMBO_END};
 const uint16_t PROGMEM combo_e_paren[]     = {KC_DOT, SE_SCLN, COMBO_END};
 const uint16_t PROGMEM combo_b_bracket[]   = {KC_U, KC_O, COMBO_END};
@@ -126,6 +128,7 @@ combo_t key_combos[] = {[COMBO_AE]          = COMBO(combo_ae, SE_ADIA), //Ä
                         [COMBO_SH]          = COMBO(combo_sh, CKC_SH),
                         [COMBO_WH]          = COMBO(combo_wh, CKC_WH),
                         [COMBO_PH]          = COMBO(combo_ph, CKC_PH),
+                        [COMBO_PERCENT]     = COMBO(combo_percent, SE_PERC),
                         [COMBO_B_PAREN]     = COMBO(combo_b_paren, SE_LPRN),
                         [COMBO_E_PAREN]     = COMBO(combo_e_paren, SE_RPRN),
                         [COMBO_B_BRACKET]   = COMBO(combo_b_bracket, SE_LBRC),
@@ -206,11 +209,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case CKC_E_SL:
             if (record->event.pressed) {
                 timer = timer_read();
-                tap_code(KC_ESC); // Change the key to be held here
             } else {
-                tap_code(KC_ESC); // Change the key that was held here, too!
                 if (timer_elapsed(timer) < TAPPING_TERM) {
                     tap_code16(SE_SLSH); // Change the character(s) to be sent on tap here
+                } else {
+                    tap_code(KC_ESC); // Change the key that was held here, too!
                 }
             }
             return false; // We handled this keypress
