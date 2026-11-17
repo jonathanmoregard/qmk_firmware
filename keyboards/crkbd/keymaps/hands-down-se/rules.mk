@@ -6,3 +6,8 @@ CAPS_WORD_ENABLE = yes
 DEFERRED_EXEC_ENABLE = yes
 
 SRC += features/custom_shift_keys.c
+
+# Unused QMK defaults, off to save flash
+SPACE_CADET_ENABLE  = no
+GRAVE_ESC_ENABLE    = no
+MAGIC_ENABLE        = no
