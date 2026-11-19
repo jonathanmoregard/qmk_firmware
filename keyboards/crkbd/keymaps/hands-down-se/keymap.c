@@ -263,7 +263,7 @@ typedef struct {
 static const adaptive_key_t adaptive_keys[] = {
     {KC_A, KC_E, KC_U}, // ae -> au (same finger A/U); A+E chord is still Ä
     {KC_P, KC_X, KC_L}, // px -> pl (scissor)
-    {KC_G, KC_X, KC_L}, // gx -> gl (scissor)
+    {KC_G, KC_P, KC_L}, // gp -> gl (scissor; ring->index inward roll)
     {KC_K, KC_C, KC_T}, // kc -> kt (same finger K/T)
     {KC_N, KC_W, KC_L}, // nw -> nl (same finger N/L)
 };
