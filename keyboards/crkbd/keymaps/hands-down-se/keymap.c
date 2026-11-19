@@ -385,11 +385,15 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
 
     const uint16_t first  = prev;
     const bool     recent = TIMER_DIFF_16(record->event.time, prev_time) < MISS_WINDOW_MS;
-    prev                  = (is_letter(key) || key == KC_H) ? key : KC_NO;
     prev_time             = record->event.time;
 
-    // Repeat key, shortcuts (Ctrl/Alt/GUI held) and other layers aren't typing misses.
-    if (get_repeat_key_count() || (get_mods() & ~MOD_MASK_SHIFT) || get_highest_layer(layer_state) != 0) return;
+    // Repeat key, shortcuts (Ctrl/Alt/GUI held) and other layers aren't typing,
+    // so they neither warn nor count as the first half of a pair (Ctrl+S, s).
+    if (get_repeat_key_count() || (get_mods() & ~MOD_MASK_SHIFT) || get_highest_layer(layer_state) != 0) {
+        prev = KC_NO;
+        return;
+    }
+    prev = (is_letter(key) || key == KC_H) ? key : KC_NO;
     if (first == KC_NO || !recent || !is_letter(key)) return;
 
     for (uint8_t i = 0; i < ARRAY_SIZE(miss_exceptions); i++) {
@@ -657,7 +661,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_VOLD, KC_W, KC_F, KC_L, KC_D, KC_V, KC_SCLN, KC_U, KC_O, KC_Y, KC_B, KC_BRID,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
-                                                                  KC_ENT, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
+                                                                  KC_NO, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
                                                                   //`--------------------------------------------'  `--------------------------------------------'
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
