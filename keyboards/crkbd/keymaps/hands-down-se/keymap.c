@@ -326,7 +326,7 @@ static void flash_miss(void) {
     static deferred_token token = INVALID_DEFERRED_TOKEN;
     cancel_deferred_exec(token);
     miss_flashing = true;
-    rgb_matrix_sethsv_noeeprom(0, 0, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // white, stands out from every layer colour
+    rgb_matrix_sethsv_noeeprom(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // red
     token = defer_exec(MISS_FLASH_MS, miss_flash_end, NULL);
 }
 
