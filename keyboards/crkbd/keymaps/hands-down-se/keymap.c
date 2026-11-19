@@ -20,8 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "features/custom_shift_keys.h"
 #include "keymap_swedish.h"
 #include "raw_hid.h"
+#include "transactions.h"
+#include <string.h>
 
-enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME, CKC_MUTE };
+// CKC_GH..CKC_PH must stay in this order: the training scores index by it.
+enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME, CKC_WARN };
+
+// Left inner thumb: hold for layer 1, tap for Repeat. Repeat sits on the left
+// thumb (next to R), not beside Space, so words ending in a double letter
+// don't become a same-thumb Repeat+Space pair. KC_F24 is a placeholder.
+#define LT_REP LT(1, KC_F24)
 
 const custom_shift_key_t custom_shift_keys[] = {
     // single keys
@@ -161,6 +169,8 @@ static void reset_keyboard_state(void) {
 }
 
 static void stats_flush(void);
+static void hint_sync(void);
+static void hint_slave_handler(uint8_t in_len, const void *in_data, uint8_t out_len, void *out_data);
 
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     // If execution reaches here, the keyboard has gone idle.
@@ -178,6 +188,7 @@ static bool     e_sl_esc  = false;
 // Also sends Esc once the slash/Esc key has been held past TAPPING_TERM.
 void housekeeping_task_user(void) {
     if (!is_keyboard_master()) return;
+    hint_sync();
     if (e_sl_held && !e_sl_esc && timer_elapsed(e_sl_timer) >= TAPPING_TERM) {
         tap_code(KC_ESC);
         e_sl_esc = true;
@@ -197,11 +208,7 @@ void housekeeping_task_user(void) {
 
 // Underglow colour, first match wins: Caps Lock red, Caps Word orange-red,
 // then per layer: base green, numbers purple, nav blue, mouse teal.
-static bool miss_flashing = false; // A miss blink owns the LEDs until it ends.
-static bool miss_muted    = false; // CKC_MUTE: no blink or ting; the mute key glows red.
-
 static void set_layer_color(uint8_t layer) {
-    if (miss_flashing) return;
     const uint8_t val = RGB_MATRIX_MAXIMUM_BRIGHTNESS; // Ignore the stored (dim) value.
     if (host_keyboard_led_state().caps_lock) {
         rgb_matrix_sethsv_noeeprom(0, 255, val); // red
@@ -222,6 +229,7 @@ static void set_layer_color(uint8_t layer) {
 void keyboard_post_init_user(void) {
     rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
     set_layer_color(0);
+    transaction_register_rpc(USER_SYNC_HINT, hint_slave_handler);
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
@@ -250,6 +258,14 @@ static void send_h_bigram(uint16_t keycode) {
         SEND_STRING(SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
     }
 }
+
+// Training hint items (see the Training hints section): the H combos first,
+// then the rolls, then doubled letters.
+#define N_COMBOS 6
+#define ROLL_BASE N_COMBOS
+enum { LVL_COMBOS = 1, LVL_ROLLS, LVL_REPEAT }; // What warns, per CKC_WARN mode.
+static uint8_t warn_level = LVL_REPEAT;
+static void    train_hit(uint8_t item);
 
 // Adaptive keys (Hands Down style): rolling FIRST then TRIGGER within
 // ADAPTIVE_TERM types FIRST then OUTPUT, removing a same-finger pair or
@@ -290,6 +306,7 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
     for (uint8_t i = 0; i < ARRAY_SIZE(adaptive_keys); i++) {
         if (adaptive_keys[i].first == prev && adaptive_keys[i].trigger == key) {
             const uint16_t out = adaptive_keys[i].output;
+            train_hit(ROLL_BASE + i);
             tap_code16(is_caps_word_on() ? LSFT(out) : out);
             set_last_keycode(out); // Repeat key repeats the output.
             adaptive_prev = out;
@@ -297,67 +314,6 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
         }
     }
     return true;
-}
-
-// Training hint: blink the underglow when a pair was typed the long way
-// instead of with its roll, H combo or the Repeat key. Only the produced
-// pair is checked, so roll triggers (px, ae...) never blink.
-#define MISS_WINDOW_MS 1000 // Pairs further apart than this aren't flagged.
-#define MISS_FLASH_MS 250
-
-static const uint16_t missed_pairs[][2] = {
-    {KC_P, KC_L}, {KC_A, KC_U}, {KC_N, KC_L}, // rolls
-    {KC_T, KC_H}, {KC_C, KC_H}, {KC_S, KC_H}, {KC_W, KC_H}, {KC_P, KC_H}, {KC_G, KC_H}, // H combos
-};
-
-// Pairs never flagged. Doubles listed here won't ask for the Repeat key.
-static const uint16_t miss_exceptions[][2] = {
-    {KC_R, KC_R}, // R and Repeat share the left thumb, so Repeat doesn't help.
-};
-
-static bool is_letter(uint16_t key) {
-    return (key >= KC_A && key <= KC_Z) || key == KC_LBRC || key == KC_QUOT || key == KC_SCLN; // + å ä ö
-}
-
-// Left outer thumb: mute miss warnings (blink + host ting) for 30 minutes;
-// press again to unmute early.
-#define MISS_MUTE_MS (30UL * 60 * 1000)
-static deferred_token miss_mute_token = INVALID_DEFERRED_TOKEN;
-
-static uint32_t miss_mute_end(uint32_t trigger_time, void *cb_arg) {
-    miss_muted      = false;
-    miss_mute_token = INVALID_DEFERRED_TOKEN;
-    set_layer_color(get_highest_layer(layer_state));
-    return 0;
-}
-
-static void toggle_miss_mute(void) {
-    cancel_deferred_exec(miss_mute_token);
-    miss_mute_token = INVALID_DEFERRED_TOKEN;
-    miss_muted      = !miss_muted;
-    if (miss_muted) miss_mute_token = defer_exec(MISS_MUTE_MS, miss_mute_end, NULL);
-    set_layer_color(get_highest_layer(layer_state));
-}
-
-// While muted, only the mute key itself is red (drawn over the layer colour).
-bool rgb_matrix_indicators_user(void) {
-    if (!miss_muted || miss_flashing) return true;
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            uint8_t led = g_led_config.matrix_co[row][col];
-            if (led == NO_LED) continue;
-            if (keymap_key_to_keycode(0, (keypos_t){.row = row, .col = col}) == CKC_MUTE) {
-                rgb_matrix_set_color(led, RGB_MATRIX_MAXIMUM_BRIGHTNESS, 0, 0);
-            }
-        }
-    }
-    return true;
-}
-
-static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
-    miss_flashing = false;
-    set_layer_color(get_highest_layer(layer_state));
-    return 0;
 }
 
 // Typing stats for the host (corne-miss-beep logs them; `corne-accuracy`
@@ -377,7 +333,7 @@ static void stats_flush(void) {
 static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return;
     if ((IS_QK_MOD_TAP(keycode) || IS_QK_LAYER_TAP(keycode)) && record->tap.count == 0) return; // held
-    if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR || keycode == CKC_MUTE) return;
+    if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR || keycode == CKC_WARN) return;
     if (get_mods() & ~MOD_MASK_SHIFT) return; // shortcuts aren't typing
     if (keycode == CKC_C_BSP || keycode == KC_BSPC) {
         stat_bsp++;
@@ -387,18 +343,153 @@ static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
     if (stat_keys + stat_bsp >= STATS_BATCH) stats_flush();
 }
 
-static void flash_miss(void) {
-    static deferred_token token = INVALID_DEFERRED_TOKEN;
-    stat_miss++; // Still counted while muted.
-    if (miss_muted) return;
-    cancel_deferred_exec(token);
-    miss_flashing = true;
-    rgb_matrix_sethsv_noeeprom(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // red
+// Training hints: when a pair is typed the long way instead of with its
+// H combo, roll or the Repeat key, the keys that should have been used pulse
+// gold for 3 s and the host plays a ting. Only the produced pair is checked,
+// so roll triggers (px, ae...) never warn.
+// Lenient: every H combo, roll and letter (for doubles) keeps a score, +1 per
+// correct use and -1 per miss, and warns only while the score is below zero.
+// At most one warning a minute; scores reset every 24 h of uptime.
+#define MISS_WINDOW_MS 1000 // Pairs further apart than this aren't misses.
+#define HINT_MS 3000
+#define HINT_PULSE_MS 750
+#define WARN_GAP_MS 60000UL
+#define SCORE_RESET_MS (24UL * 60 * 60 * 1000)
+#define SCORE_LIMIT 100
+
+#define REPEAT_BASE (ROLL_BASE + ARRAY_SIZE(adaptive_keys))
+#define N_ITEMS (REPEAT_BASE + 29) // a-z, å, ä, ö
+
+// Same order as CKC_GH..CKC_PH.
+static const uint16_t  combo_first[N_COMBOS] = {KC_G, KC_T, KC_C, KC_S, KC_W, KC_P};
+static const uint16_t *const combo_keys[N_COMBOS] = {combo_gh, combo_th, combo_ch, combo_sh, combo_wh, combo_ph};
+
+// Pairs never flagged. Doubles listed here won't ask for the Repeat key.
+static const uint16_t miss_exceptions[][2] = {
+    {KC_R, KC_R}, // R and Repeat share the left thumb, so Repeat doesn't help.
+};
+
+static bool is_letter(uint16_t key) {
+    return (key >= KC_A && key <= KC_Z) || key == KC_LBRC || key == KC_QUOT || key == KC_SCLN; // + å ä ö
+}
+
+static uint8_t letter_index(uint16_t key) {
+    switch (key) {
+        case KC_LBRC: return 26; // å
+        case KC_QUOT: return 27; // ä
+        case KC_SCLN: return 28; // ö
+        default: return key - KC_A;
+    }
+}
+
+static int8_t   score[N_ITEMS];
+static uint32_t score_epoch = 0;
+
+static void score_maybe_reset(void) {
+    if (timer_elapsed32(score_epoch) >= SCORE_RESET_MS) {
+        memset(score, 0, sizeof(score));
+        score_epoch = timer_read32();
+    }
+}
+
+static void train_hit(uint8_t item) {
+    score_maybe_reset();
+    if (score[item] < SCORE_LIMIT) score[item]++;
+}
+
+// The hint (the keys to have pressed) is sent to the right half too, since
+// it may light keys there.
+typedef struct {
+    uint16_t keys[2];
+} hint_t;
+
+static hint_t   hint;
+static uint16_t hint_start;
+static bool     hint_on          = false;
+static bool     hint_sync_needed = false;
+
+static void hint_slave_handler(uint8_t in_len, const void *in_data, uint8_t out_len, void *out_data) {
+    memcpy(&hint, in_data, sizeof(hint));
+    hint_start = timer_read();
+    hint_on    = true;
+}
+
+// Home-row mod-taps match by their letter, so KC_E finds RCTL_T(KC_E).
+static uint16_t strip_mod_tap(uint16_t kc) {
+    return IS_QK_MOD_TAP(kc) ? QK_MOD_TAP_GET_TAP_KEYCODE(kc) : kc;
+}
+
+static void show_hint(uint16_t key_a, uint16_t key_b) {
+    hint.keys[0]     = strip_mod_tap(key_a);
+    hint.keys[1]     = strip_mod_tap(key_b);
+    hint_start       = timer_read();
+    hint_on          = true;
+    hint_sync_needed = true;
+}
+
+// Called from the master's housekeeping. Gives up once the hint is over.
+static void hint_sync(void) {
+    if (!hint_sync_needed) return;
+    if (transaction_rpc_send(USER_SYNC_HINT, sizeof(hint), &hint) || timer_elapsed(hint_start) >= HINT_MS) {
+        hint_sync_needed = false;
+    }
+}
+
+static uint8_t item_level(uint8_t item) {
+    return item < ROLL_BASE ? LVL_COMBOS : item < REPEAT_BASE ? LVL_ROLLS : LVL_REPEAT;
+}
+
+static void train_miss(uint8_t item, uint16_t key_a, uint16_t key_b) {
+    static uint32_t last_warn = 0;
+    static bool     warned    = false;
+    stat_miss++; // Every miss counts for the stats, warned or not.
+    score_maybe_reset();
+    if (score[item] > -SCORE_LIMIT) score[item]--;
+    if (score[item] >= 0 || warn_level < item_level(item)) return;
+    if (warned && timer_elapsed32(last_warn) < WARN_GAP_MS) return;
+    warned    = true;
+    last_warn = timer_read32();
+    show_hint(key_a, key_b);
     // Tell the host too: the corne-miss-beep user service plays a soft beep.
     // Report: 'Q' 'M' 0x01 (miss), rest zero. Costs at most ~10 ms if nothing reads it.
     uint8_t report[32] = {'Q', 'M', 0x01};
     raw_hid_send(report, sizeof(report));
-    token = defer_exec(MISS_FLASH_MS, miss_flash_end, NULL);
+}
+
+// Draw over the layer colour: the mode key in its mode colour (red: H combos,
+// yellow: + rolls, green: + Repeat) and, during a hint, the keys to have
+// pressed pulsing gold. Each half only lights its own LEDs.
+bool rgb_matrix_indicators_user(void) {
+    const uint8_t max   = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
+    uint8_t       pulse = 0;
+    if (hint_on) {
+        const uint16_t t = timer_elapsed(hint_start);
+        if (t >= HINT_MS) {
+            hint_on = false;
+        } else {
+            const uint16_t half  = HINT_PULSE_MS / 2;
+            const uint16_t phase = t % HINT_PULSE_MS;
+            const uint16_t dist  = phase < half ? half - phase : phase - half; // bright at t = 0
+            pulse                = 30 + (uint32_t)dist * (max - 30) / half;
+        }
+    }
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            const uint8_t led = g_led_config.matrix_co[row][col];
+            if (led == NO_LED) continue;
+            const uint16_t kc = strip_mod_tap(keymap_key_to_keycode(0, (keypos_t){.row = row, .col = col}));
+            if (kc == CKC_WARN) {
+                switch (warn_level) {
+                    case LVL_COMBOS: rgb_matrix_set_color(led, max, 0, 0); break;
+                    case LVL_ROLLS: rgb_matrix_set_color(led, max, max, 0); break;
+                    default: rgb_matrix_set_color(led, 0, max, 0); break;
+                }
+            } else if (hint_on && (kc == hint.keys[0] || kc == hint.keys[1])) {
+                rgb_matrix_set_color(led, pulse, pulse * 2 / 3, 0); // gold
+            }
+        }
+    }
+    return true;
 }
 
 // Call on every press that wasn't swallowed by an adaptive key.
@@ -413,6 +504,7 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
         key = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
     }
     if (keycode >= CKC_GH && keycode <= CKC_PH) { // H combo: used correctly, ends in h.
+        train_hit(keycode - CKC_GH);
         prev      = KC_H;
         prev_time = record->event.time;
         return;
@@ -425,6 +517,7 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
     // Repeat key, shortcuts (Ctrl/Alt/GUI held) and other layers aren't typing,
     // so they neither warn nor count as the first half of a pair (Ctrl+S, s).
     if (get_repeat_key_count() || (get_mods() & ~MOD_MASK_SHIFT) || get_highest_layer(layer_state) != 0) {
+        if (get_repeat_key_count() > 0 && is_letter(key)) train_hit(REPEAT_BASE + letter_index(key)); // A double done right.
         prev = KC_NO;
         return;
     }
@@ -434,21 +527,28 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
     for (uint8_t i = 0; i < ARRAY_SIZE(miss_exceptions); i++) {
         if (miss_exceptions[i][0] == first && miss_exceptions[i][1] == key) return;
     }
-    bool missed = first == key; // A double that Repeat could have typed.
-    for (uint8_t i = 0; !missed && i < ARRAY_SIZE(missed_pairs); i++) {
-        missed = missed_pairs[i][0] == first && missed_pairs[i][1] == key;
+    if (first == key) { // A double that Repeat could have typed.
+        train_miss(REPEAT_BASE + letter_index(key), LT_REP, LT_REP);
+        return;
     }
-    if (missed) flash_miss();
+    for (uint8_t i = 0; i < ARRAY_SIZE(adaptive_keys); i++) {
+        if (adaptive_keys[i].first == first && adaptive_keys[i].output == key) { // Roll: the trigger key.
+            train_miss(ROLL_BASE + i, adaptive_keys[i].trigger, adaptive_keys[i].trigger);
+            return;
+        }
+    }
+    if (key != KC_H) return;
+    for (uint8_t i = 0; i < N_COMBOS; i++) {
+        if (combo_first[i] == first) { // H combo: both combo keys.
+            train_miss(i, pgm_read_word(&combo_keys[i][0]), pgm_read_word(&combo_keys[i][1]));
+            return;
+        }
+    }
 }
-
-// Left inner thumb: hold for layer 1, tap for Repeat. Repeat sits on the left
-// thumb (next to R), not beside Space, so words ending in a double letter
-// don't become a same-thumb Repeat+Space pair. KC_F24 is a placeholder.
-#define LT_REP LT(1, KC_F24)
 
 // The tapped LT_REP must not become the "last key" itself.
 bool remember_last_key_user(uint16_t keycode, keyrecord_t *record, uint8_t *remembered_mods) {
-    return keycode != LT_REP && keycode != CKC_MUTE;
+    return keycode != LT_REP && keycode != CKC_WARN;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -530,9 +630,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 reset_keyboard_state();
             }
             return false;
-        case CKC_MUTE:
+        case CKC_WARN:
             if (record->event.pressed) {
-                toggle_miss_mute();
+                warn_level = warn_level % LVL_REPEAT + 1; // 1 -> 2 -> 3 -> 1
             }
             return false;
         case CKC_E_SL:
@@ -701,7 +801,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_VOLD, KC_W, KC_F, KC_L, KC_D, KC_V, KC_SCLN, KC_U, KC_O, KC_Y, KC_B, KC_BRID,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
-                                                                  CKC_MUTE, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
+                                                                  CKC_WARN, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
                                                                   //`--------------------------------------------'  `--------------------------------------------'
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
