@@ -345,7 +345,7 @@ static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
 
 // Training hints: when a pair is typed the long way instead of with its
 // H combo, roll or the Repeat key, the keys that should have been used pulse
-// gold for 3 s and the host plays a ting. Only the produced pair is checked,
+// white for 3 s and the host plays a ting. Only the produced pair is checked,
 // so roll triggers (px, ae...) never warn.
 // Lenient: every H combo, roll and letter (for doubles) keeps a score, +1 per
 // correct use and -1 per miss, and warns only while the score is below zero.
@@ -353,6 +353,7 @@ static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
 #define MISS_WINDOW_MS 1000 // Pairs further apart than this aren't misses.
 #define HINT_MS 3000
 #define HINT_PULSE_MS 750
+#define HINT_FLOOR 100 // Dimmest point of the pulse; peak is full brightness.
 #define WARN_GAP_MS 60000UL
 #define SCORE_RESET_MS (24UL * 60 * 60 * 1000)
 #define SCORE_LIMIT 100
@@ -458,7 +459,7 @@ static void train_miss(uint8_t item, uint16_t key_a, uint16_t key_b) {
 
 // Draw over the layer colour: the mode key in its mode colour (red: H combos,
 // yellow: + rolls, green: + Repeat) and, during a hint, the keys to have
-// pressed pulsing gold. Each half only lights its own LEDs.
+// pressed pulsing white. Each half only lights its own LEDs.
 bool rgb_matrix_indicators_user(void) {
     const uint8_t max   = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
     uint8_t       pulse = 0;
@@ -470,7 +471,7 @@ bool rgb_matrix_indicators_user(void) {
             const uint16_t half  = HINT_PULSE_MS / 2;
             const uint16_t phase = t % HINT_PULSE_MS;
             const uint16_t dist  = phase < half ? half - phase : phase - half; // bright at t = 0
-            pulse                = 30 + (uint32_t)dist * (max - 30) / half;
+            pulse                = HINT_FLOOR + (uint32_t)dist * (max - HINT_FLOOR) / half;
         }
     }
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
@@ -485,7 +486,7 @@ bool rgb_matrix_indicators_user(void) {
                     default: rgb_matrix_set_color(led, 0, max, 0); break;
                 }
             } else if (hint_on && (kc == hint.keys[0] || kc == hint.keys[1])) {
-                rgb_matrix_set_color(led, pulse, pulse * 2 / 3, 0); // gold
+                rgb_matrix_set_color(led, pulse, pulse, pulse); // white
             }
         }
     }
