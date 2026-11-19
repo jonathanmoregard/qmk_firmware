@@ -264,8 +264,6 @@ typedef struct {
 static const adaptive_key_t adaptive_keys[] = {
     {KC_A, KC_E, KC_U}, // ae -> au (same finger A/U); A+E chord is still Ä
     {KC_P, KC_X, KC_L}, // px -> pl (scissor)
-    {KC_G, KC_P, KC_L}, // gp -> gl (scissor; ring->index inward roll)
-    {KC_K, KC_C, KC_T}, // kc -> kt (same finger K/T)
     {KC_N, KC_W, KC_L}, // nw -> nl (same finger N/L)
 };
 
@@ -308,7 +306,7 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
 #define MISS_FLASH_MS 250
 
 static const uint16_t missed_pairs[][2] = {
-    {KC_P, KC_L}, {KC_A, KC_U}, {KC_G, KC_L}, {KC_K, KC_T}, {KC_N, KC_L}, // rolls
+    {KC_P, KC_L}, {KC_A, KC_U}, {KC_N, KC_L}, // rolls
     {KC_T, KC_H}, {KC_C, KC_H}, {KC_S, KC_H}, {KC_W, KC_H}, {KC_P, KC_H}, {KC_G, KC_H}, // H combos
 };
 
