@@ -149,7 +149,47 @@ combo_t key_combos[] = {[COMBO_AE]          = COMBO(combo_ae, SE_ADIA), //Ä
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     // If execution reaches here, the keyboard has gone idle.
     layer_clear();
+    if (host_keyboard_led_state().caps_lock) {
+        tap_code(KC_CAPS); // Caps Lock resets on idle, like layers.
+    }
     return 0;
+}
+
+// Hold both Ctrls + a Shift to toggle Caps Lock (fires once per chord).
+void housekeeping_task_user(void) {
+    if (!is_keyboard_master()) return;
+    static bool  chord_held = false;
+    const uint8_t mods      = get_mods();
+    const bool    chord     = (mods & MOD_BIT(KC_LCTL)) && (mods & MOD_BIT(KC_RCTL)) && (mods & MOD_MASK_SHIFT);
+    if (chord && !chord_held) {
+        clear_mods(); // Send a bare Caps Lock, not Ctrl+Shift+Caps.
+        send_keyboard_report();
+        tap_code(KC_CAPS);
+        set_mods(mods);
+        send_keyboard_report();
+    }
+    chord_held = chord;
+}
+
+// Per-layer underglow colour: base green, numbers purple, nav blue, mouse orange.
+static void set_layer_color(uint8_t layer) {
+    const uint8_t val = rgb_matrix_get_val();
+    switch (layer) {
+        case 1: rgb_matrix_sethsv_noeeprom(191, 255, val); break; // purple
+        case 2: rgb_matrix_sethsv_noeeprom(170, 255, val); break; // blue
+        case 3: rgb_matrix_sethsv_noeeprom(21, 255, val); break;  // orange
+        default: rgb_matrix_sethsv_noeeprom(85, 255, val); break; // green
+    }
+}
+
+void keyboard_post_init_user(void) {
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+    set_layer_color(0);
+}
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    set_layer_color(get_highest_layer(state));
+    return state;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
