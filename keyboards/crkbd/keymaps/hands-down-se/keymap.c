@@ -342,7 +342,7 @@ static void stats_flush(void) {
 // Count a typing keystroke or a backspace (Ctrl+Backspace counts once).
 static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return;
-    if (IS_QK_MOD_TAP(keycode) && record->tap.count == 0) return; // held as a modifier
+    if ((IS_QK_MOD_TAP(keycode) || IS_QK_LAYER_TAP(keycode)) && record->tap.count == 0) return; // held
     if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR) return;
     if (get_mods() & ~MOD_MASK_SHIFT) return; // shortcuts aren't typing
     if (keycode == CKC_C_BSP || keycode == KC_BSPC) {
@@ -402,12 +402,27 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
     if (missed) flash_miss();
 }
 
+// Left inner thumb: hold for layer 1, tap for Repeat. Repeat sits on the left
+// thumb (next to R), not beside Space, so words ending in a double letter
+// don't become a same-thumb Repeat+Space pair. KC_F24 is a placeholder.
+#define LT_REP LT(1, KC_F24)
+
+// The tapped LT_REP must not become the "last key" itself.
+bool remember_last_key_user(uint16_t keycode, keyrecord_t *record, uint8_t *remembered_mods) {
+    return keycode != LT_REP;
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // On every key event, start or extend the deferred execution to call
     // `idle_callback()` after IDLE_TIMEOUT_MS.
     static deferred_token idle_token = INVALID_DEFERRED_TOKEN;
     if (!extend_deferred_exec(idle_token, IDLE_TIMEOUT_MS)) {
         idle_token = defer_exec(IDLE_TIMEOUT_MS, idle_callback, NULL);
+    }
+
+    if (keycode == LT_REP && record->tap.count) {
+        repeat_key_invoke(&record->event); // Re-enters with the repeated key.
+        return false;
     }
 
     count_keystroke(keycode, record);
@@ -565,6 +580,12 @@ char chordal_hold_handedness(keypos_t key) {
     return key.row < MATRIX_ROWS / 2 ? 'L' : 'R';
 }
 
+// The layer/Repeat thumb must hold with left-hand keys too (layer 1 spans both).
+bool get_chordal_hold(uint16_t tap_hold_keycode, keyrecord_t *tap_hold_record, uint16_t other_keycode, keyrecord_t *other_record) {
+    if (tap_hold_keycode == LT_REP) return true;
+    return get_chordal_hold_default(tap_hold_record, other_record);
+}
+
 // Letters (incl. å ä ö), space and punctuation count as "typing" for Flow Tap.
 static bool is_typing_key(uint16_t keycode) {
     switch (get_tap_keycode(keycode)) {
@@ -636,7 +657,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_VOLD, KC_W, KC_F, KC_L, KC_D, KC_V, KC_SCLN, KC_U, KC_O, KC_Y, KC_B, KC_BRID,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
-                                                                  QK_REP, KC_R, MO(1), KC_HYPR, KC_SPACE, CKC_C_BSP
+                                                                  KC_ENT, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
                                                                   //`--------------------------------------------'  `--------------------------------------------'
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
