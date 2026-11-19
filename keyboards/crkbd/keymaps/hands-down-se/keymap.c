@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include QMK_KEYBOARD_H
 #include "features/custom_shift_keys.h"
 #include "keymap_swedish.h"
+#include "raw_hid.h"
 
 enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME };
 
@@ -327,6 +328,10 @@ static void flash_miss(void) {
     cancel_deferred_exec(token);
     miss_flashing = true;
     rgb_matrix_sethsv_noeeprom(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // red
+    // Tell the host too: the corne-miss-beep user service plays a soft beep.
+    // Report: 'Q' 'M' 0x01 (miss), rest zero. Costs at most ~10 ms if nothing reads it.
+    uint8_t report[32] = {'Q', 'M', 0x01};
+    raw_hid_send(report, sizeof(report));
     token = defer_exec(MISS_FLASH_MS, miss_flash_end, NULL);
 }
 
