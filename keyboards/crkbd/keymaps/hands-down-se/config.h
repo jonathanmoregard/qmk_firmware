@@ -54,4 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #    define RGBLIGHT_VAL_STEP 17
 #endif
 
+// Board default caps brightness at 120/255. Single-colour fills draw about a
+// third of white's current, so 170 stays within what USB ports supply.
+#undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
+#define RGB_MATRIX_MAXIMUM_BRIGHTNESS 170
+
 #define LAYER_STATE_8BIT // 4 layers in use; 8-bit layer state saves flash

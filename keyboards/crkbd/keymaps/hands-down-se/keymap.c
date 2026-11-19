@@ -194,7 +194,7 @@ void housekeeping_task_user(void) {
 // Underglow colour, first match wins: Caps Lock red, Caps Word orange-red,
 // then per layer: base green, numbers purple, nav blue, mouse teal.
 static void set_layer_color(uint8_t layer) {
-    const uint8_t val = rgb_matrix_get_val();
+    const uint8_t val = RGB_MATRIX_MAXIMUM_BRIGHTNESS; // Ignore the stored (dim) value.
     if (host_keyboard_led_state().caps_lock) {
         rgb_matrix_sethsv_noeeprom(0, 255, val); // red
         return;
@@ -297,7 +297,7 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
 // instead of with its roll, H combo or the Repeat key. Only the produced
 // pair is checked, so roll triggers (px, ae...) never blink.
 #define MISS_WINDOW_MS 1000 // Pairs further apart than this aren't flagged.
-#define MISS_FLASH_MS 150
+#define MISS_FLASH_MS 250
 
 static const uint16_t missed_pairs[][2] = {
     {KC_P, KC_L}, {KC_A, KC_U}, {KC_G, KC_L}, {KC_K, KC_T}, {KC_N, KC_L}, // rolls
@@ -321,7 +321,7 @@ static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
 static void flash_miss(void) {
     static deferred_token token = INVALID_DEFERRED_TOKEN;
     cancel_deferred_exec(token);
-    rgb_matrix_sethsv_noeeprom(43, 90, rgb_matrix_get_val() / 2); // soft pale yellow
+    rgb_matrix_sethsv_noeeprom(0, 0, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // white, stands out from every layer colour
     token = defer_exec(MISS_FLASH_MS, miss_flash_end, NULL);
 }
 
