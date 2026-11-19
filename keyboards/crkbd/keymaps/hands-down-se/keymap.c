@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "features/custom_shift_keys.h"
 #include "keymap_swedish.h"
 
-enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL };
+enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME };
 
 const custom_shift_key_t custom_shift_keys[] = {
     // single keys
@@ -138,7 +138,7 @@ combo_t key_combos[] = {[COMBO_AE]          = COMBO(combo_ae, SE_ADIA), //Ä
                         [COMBO_UNDERSCORE]  = COMBO(combo_underscore, SE_UNDS),
                         [COMBO_AMPERSAND]   = COMBO(combo_ampersand, SE_AMPR),
                         [COMBO_LAYER_NAV]   = COMBO(combo_layer_nav, TO(2)),
-                        [COMBO_LAYER_HOME]  = COMBO(combo_layer_home, TO(0)),
+                        [COMBO_LAYER_HOME]  = COMBO(combo_layer_home, CKC_HOME),
                         [COMBO_LAYER_MOUSE] = COMBO(combo_layer_mouse, TO(3)),
                         [COMBO_ENTER]       = COMBO(combo_enter, KC_ENTER),
                         [COMBO_TAB]         = COMBO(combo_tab, KC_TAB),
@@ -286,6 +286,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     static uint16_t timer;
 
     switch (keycode) {
+        case CKC_HOME:
+            // Home combo: base layer, Caps Word off, Caps Lock off.
+            if (record->event.pressed) {
+                layer_move(0);
+                caps_word_off();
+                if (host_keyboard_led_state().caps_lock) {
+                    tap_code(KC_CAPS);
+                }
+            }
+            return false;
         case CKC_E_SL:
             if (record->event.pressed) {
                 timer = timer_read();
