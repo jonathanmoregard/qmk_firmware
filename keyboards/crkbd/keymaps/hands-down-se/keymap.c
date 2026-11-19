@@ -293,6 +293,74 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
+// Training hint: blink the underglow when a pair was typed the long way
+// instead of with its roll, H combo or the Repeat key. Only the produced
+// pair is checked, so roll triggers (px, ae...) never blink.
+#define MISS_WINDOW_MS 1000 // Pairs further apart than this aren't flagged.
+#define MISS_FLASH_MS 150
+
+static const uint16_t missed_pairs[][2] = {
+    {KC_P, KC_L}, {KC_A, KC_U}, {KC_G, KC_L}, {KC_K, KC_T}, {KC_N, KC_L}, // rolls
+    {KC_T, KC_H}, {KC_C, KC_H}, {KC_S, KC_H}, {KC_W, KC_H}, {KC_P, KC_H}, {KC_G, KC_H}, // H combos
+};
+
+// Pairs never flagged. Doubles listed here won't ask for the Repeat key.
+static const uint16_t miss_exceptions[][2] = {
+    {KC_R, KC_R}, // R and Repeat share the left thumb, so Repeat doesn't help.
+};
+
+static bool is_letter(uint16_t key) {
+    return (key >= KC_A && key <= KC_Z) || key == KC_LBRC || key == KC_QUOT || key == KC_SCLN; // + å ä ö
+}
+
+static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
+    set_layer_color(get_highest_layer(layer_state));
+    return 0;
+}
+
+static void flash_miss(void) {
+    static deferred_token token = INVALID_DEFERRED_TOKEN;
+    cancel_deferred_exec(token);
+    rgb_matrix_sethsv_noeeprom(43, 90, rgb_matrix_get_val() / 2); // soft pale yellow
+    token = defer_exec(MISS_FLASH_MS, miss_flash_end, NULL);
+}
+
+// Call on every press that wasn't swallowed by an adaptive key.
+static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
+    static uint16_t prev      = KC_NO;
+    static uint16_t prev_time = 0;
+    if (!record->event.pressed) return;
+
+    uint16_t key = keycode;
+    if (IS_QK_MOD_TAP(keycode)) {
+        if (record->tap.count == 0) return; // Held as a modifier.
+        key = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
+    }
+    if (keycode >= CKC_GH && keycode <= CKC_PH) { // H combo: used correctly, ends in h.
+        prev      = KC_H;
+        prev_time = record->event.time;
+        return;
+    }
+
+    const uint16_t first  = prev;
+    const bool     recent = TIMER_DIFF_16(record->event.time, prev_time) < MISS_WINDOW_MS;
+    prev                  = (is_letter(key) || key == KC_H) ? key : KC_NO;
+    prev_time             = record->event.time;
+
+    // Repeat key, shortcuts (Ctrl/Alt/GUI held) and other layers aren't typing misses.
+    if (get_repeat_key_count() || (get_mods() & ~MOD_MASK_SHIFT) || get_highest_layer(layer_state) != 0) return;
+    if (first == KC_NO || !recent || !is_letter(key)) return;
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(miss_exceptions); i++) {
+        if (miss_exceptions[i][0] == first && miss_exceptions[i][1] == key) return;
+    }
+    bool missed = first == key; // A double that Repeat could have typed.
+    for (uint8_t i = 0; !missed && i < ARRAY_SIZE(missed_pairs); i++) {
+        missed = missed_pairs[i][0] == first && missed_pairs[i][1] == key;
+    }
+    if (missed) flash_miss();
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // On every key event, start or extend the deferred execution to call
     // `idle_callback()` after IDLE_TIMEOUT_MS.
@@ -304,6 +372,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!process_adaptive_key(keycode, record)) {
         return false;
     }
+    check_missed_shortcut(keycode, record);
 
     if (record->tap.count == 1 && !record->event.pressed) {
         // Go to base layer if modtap char is typed
