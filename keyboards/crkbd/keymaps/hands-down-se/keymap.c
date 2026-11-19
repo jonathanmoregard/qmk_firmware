@@ -160,9 +160,12 @@ static void reset_keyboard_state(void) {
     }
 }
 
+static void stats_flush(void);
+
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     // If execution reaches here, the keyboard has gone idle.
     reset_keyboard_state();
+    stats_flush();
     return 0;
 }
 
@@ -323,8 +326,36 @@ static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
     return 0;
 }
 
+// Typing stats for the host (corne-miss-beep logs them; `corne-accuracy`
+// summarises). Counts only, never which keys. Report: 'Q' 'S', then
+// keystrokes, backspaces, misses as little-endian uint16, since the last report.
+#define STATS_BATCH 50
+static uint16_t stat_keys = 0, stat_bsp = 0, stat_miss = 0;
+
+static void stats_flush(void) {
+    if (!stat_keys && !stat_bsp && !stat_miss) return;
+    uint8_t report[32] = {'Q', 'S', stat_keys & 0xFF, stat_keys >> 8, stat_bsp & 0xFF, stat_bsp >> 8, stat_miss & 0xFF, stat_miss >> 8};
+    raw_hid_send(report, sizeof(report));
+    stat_keys = stat_bsp = stat_miss = 0;
+}
+
+// Count a typing keystroke or a backspace (Ctrl+Backspace counts once).
+static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
+    if (!record->event.pressed) return;
+    if (IS_QK_MOD_TAP(keycode) && record->tap.count == 0) return; // held as a modifier
+    if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR) return;
+    if (get_mods() & ~MOD_MASK_SHIFT) return; // shortcuts aren't typing
+    if (keycode == CKC_C_BSP || keycode == KC_BSPC) {
+        stat_bsp++;
+    } else {
+        stat_keys++;
+    }
+    if (stat_keys + stat_bsp >= STATS_BATCH) stats_flush();
+}
+
 static void flash_miss(void) {
     static deferred_token token = INVALID_DEFERRED_TOKEN;
+    stat_miss++;
     cancel_deferred_exec(token);
     miss_flashing = true;
     rgb_matrix_sethsv_noeeprom(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // red
@@ -378,6 +409,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!extend_deferred_exec(idle_token, IDLE_TIMEOUT_MS)) {
         idle_token = defer_exec(IDLE_TIMEOUT_MS, idle_callback, NULL);
     }
+
+    count_keystroke(keycode, record);
 
     if (!process_adaptive_key(keycode, record)) {
         return false;
