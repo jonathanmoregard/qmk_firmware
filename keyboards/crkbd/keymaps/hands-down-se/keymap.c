@@ -144,7 +144,7 @@ combo_t key_combos[] = {[COMBO_AE]          = COMBO(combo_ae, SE_ADIA), //Ä
                         [COMBO_TAB]         = COMBO(combo_tab, KC_TAB),
                         [COMBO_AT]          = COMBO(combo_at, SE_AT)};
 
-#define IDLE_TIMEOUT_MS 60000 // Idle timeout in milliseconds.
+#define IDLE_TIMEOUT_MS 20000 // Idle timeout in milliseconds: layers and Caps Lock reset.
 
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     // If execution reaches here, the keyboard has gone idle.
@@ -171,13 +171,22 @@ void housekeeping_task_user(void) {
     chord_held = chord;
 }
 
-// Per-layer underglow colour: base green, numbers purple, nav blue, mouse orange.
+// Underglow colour, first match wins: Caps Lock red, Caps Word orange-red,
+// then per layer: base green, numbers purple, nav blue, mouse teal.
 static void set_layer_color(uint8_t layer) {
     const uint8_t val = rgb_matrix_get_val();
+    if (host_keyboard_led_state().caps_lock) {
+        rgb_matrix_sethsv_noeeprom(0, 255, val); // red
+        return;
+    }
+    if (is_caps_word_on()) {
+        rgb_matrix_sethsv_noeeprom(10, 255, val); // orange-red
+        return;
+    }
     switch (layer) {
         case 1: rgb_matrix_sethsv_noeeprom(191, 255, val); break; // purple
         case 2: rgb_matrix_sethsv_noeeprom(170, 255, val); break; // blue
-        case 3: rgb_matrix_sethsv_noeeprom(21, 255, val); break;  // orange
+        case 3: rgb_matrix_sethsv_noeeprom(128, 255, val); break; // teal
         default: rgb_matrix_sethsv_noeeprom(85, 255, val); break; // green
     }
 }
@@ -190,6 +199,17 @@ void keyboard_post_init_user(void) {
 layer_state_t layer_state_set_user(layer_state_t state) {
     set_layer_color(get_highest_layer(state));
     return state;
+}
+
+// Host toggled Caps Lock (our chord, the idle reset, or another keyboard): recolour.
+bool led_update_user(led_t led_state) {
+    set_layer_color(get_highest_layer(layer_state));
+    return true;
+}
+
+// Caps Word turned on or off: recolour.
+void caps_word_set_user(bool active) {
+    set_layer_color(get_highest_layer(layer_state));
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
