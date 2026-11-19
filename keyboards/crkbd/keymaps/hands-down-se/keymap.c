@@ -198,7 +198,7 @@ void housekeeping_task_user(void) {
 // Underglow colour, first match wins: Caps Lock red, Caps Word orange-red,
 // then per layer: base green, numbers purple, nav blue, mouse teal.
 static bool miss_flashing = false; // A miss blink owns the LEDs until it ends.
-static bool miss_muted    = false; // CKC_MUTE: no blink or ting; base layer turns red.
+static bool miss_muted    = false; // CKC_MUTE: no blink or ting; the mute key glows red.
 
 static void set_layer_color(uint8_t layer) {
     if (miss_flashing) return;
@@ -215,7 +215,7 @@ static void set_layer_color(uint8_t layer) {
         case 1: rgb_matrix_sethsv_noeeprom(191, 255, val); break; // purple
         case 2: rgb_matrix_sethsv_noeeprom(170, 255, val); break; // blue
         case 3: rgb_matrix_sethsv_noeeprom(128, 255, val); break; // teal
-        default: rgb_matrix_sethsv_noeeprom(miss_muted ? 0 : 85, 255, val); break; // green, red when muted
+        default: rgb_matrix_sethsv_noeeprom(85, 255, val); break; // green
     }
 }
 
@@ -339,6 +339,21 @@ static void toggle_miss_mute(void) {
     miss_muted      = !miss_muted;
     if (miss_muted) miss_mute_token = defer_exec(MISS_MUTE_MS, miss_mute_end, NULL);
     set_layer_color(get_highest_layer(layer_state));
+}
+
+// While muted, only the mute key itself is red (drawn over the layer colour).
+bool rgb_matrix_indicators_user(void) {
+    if (!miss_muted || miss_flashing) return true;
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            uint8_t led = g_led_config.matrix_co[row][col];
+            if (led == NO_LED) continue;
+            if (keymap_key_to_keycode(0, (keypos_t){.row = row, .col = col}) == CKC_MUTE) {
+                rgb_matrix_set_color(led, RGB_MATRIX_MAXIMUM_BRIGHTNESS, 0, 0);
+            }
+        }
+    }
+    return true;
 }
 
 static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
