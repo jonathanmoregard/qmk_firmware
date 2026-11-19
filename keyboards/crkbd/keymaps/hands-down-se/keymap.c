@@ -146,18 +146,38 @@ combo_t key_combos[] = {[COMBO_AE]          = COMBO(combo_ae, SE_ADIA), //Ä
 
 #define IDLE_TIMEOUT_MS 20000 // Idle timeout in milliseconds: layers and Caps Lock reset.
 
+// Back to a clean state: base layer, no mods, Caps Word and Caps Lock off.
+// Used by the idle timeout and the home combo.
+static void reset_keyboard_state(void) {
+    layer_clear();
+    clear_mods();
+    clear_oneshot_mods();
+    send_keyboard_report();
+    caps_word_off();
+    if (host_keyboard_led_state().caps_lock) {
+        tap_code(KC_CAPS);
+    }
+}
+
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
     // If execution reaches here, the keyboard has gone idle.
-    layer_clear();
-    if (host_keyboard_led_state().caps_lock) {
-        tap_code(KC_CAPS); // Caps Lock resets on idle, like layers.
-    }
+    reset_keyboard_state();
     return 0;
 }
 
+// Slash/Esc key state (see CKC_E_SL in process_record_user).
+static uint16_t e_sl_timer;
+static bool     e_sl_held = false;
+static bool     e_sl_esc  = false;
+
 // Hold both Ctrls + a Shift to toggle Caps Lock (fires once per chord).
+// Also sends Esc once the slash/Esc key has been held past TAPPING_TERM.
 void housekeeping_task_user(void) {
     if (!is_keyboard_master()) return;
+    if (e_sl_held && !e_sl_esc && timer_elapsed(e_sl_timer) >= TAPPING_TERM) {
+        tap_code(KC_ESC);
+        e_sl_esc = true;
+    }
     static bool  chord_held = false;
     const uint8_t mods      = get_mods();
     const bool    chord     = (mods & MOD_BIT(KC_LCTL)) && (mods & MOD_BIT(KC_RCTL)) && (mods & MOD_MASK_SHIFT);
@@ -212,6 +232,17 @@ void caps_word_set_user(bool active) {
     set_layer_color(get_highest_layer(layer_state));
 }
 
+// Type <key>h, uppercase when Caps Word is on.
+static void send_h_bigram(uint16_t keycode) {
+    if (is_caps_word_on()) {
+        tap_code16(LSFT(keycode));
+        tap_code16(LSFT(KC_H));
+    } else {
+        tap_code(keycode);
+        SEND_STRING(SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
+    }
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // On every key event, start or extend the deferred execution to call
     // `idle_callback()` after IDLE_TIMEOUT_MS.
@@ -242,23 +273,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case SE_ODIA:
             case SE_ADIA:
             case SE_ARNG:
-            case KC_MINS:
+            case SE_MINS:
             case CKC_GH ... CKC_PH:
-            case KC_UNDS:
             case SE_UNDS:
                 layer_clear();
         }
     }
 
-    void send_h_bigram(uint16_t keycode) {
-        if (is_caps_word_on()) {
-            tap_code16(LSFT(keycode));
-            tap_code16(LSFT(KC_H));
-        } else {
-            tap_code(keycode);
-            SEND_STRING(SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
-        }
-    }
     // Shift + % combo -> ~ (Swedish ~ is a dead key, so follow with space).
     static bool tilde_sent = false;
     if (keycode == SE_PERC) {
@@ -283,28 +304,24 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
-    static uint16_t timer;
-
     switch (keycode) {
         case CKC_HOME:
-            // Home combo: base layer, Caps Word off, Caps Lock off.
             if (record->event.pressed) {
-                layer_move(0);
-                caps_word_off();
-                if (host_keyboard_led_state().caps_lock) {
-                    tap_code(KC_CAPS);
-                }
+                reset_keyboard_state();
             }
             return false;
         case CKC_E_SL:
+            // Tap: /. Hold: Esc, sent by housekeeping_task_user as soon as
+            // TAPPING_TERM passes, so it doesn't wait for the release.
             if (record->event.pressed) {
-                timer = timer_read();
+                e_sl_timer = timer_read();
+                e_sl_held  = true;
+                e_sl_esc   = false;
             } else {
-                if (timer_elapsed(timer) < TAPPING_TERM) {
-                    tap_code16(SE_SLSH); // Change the character(s) to be sent on tap here
-                } else {
-                    tap_code(KC_ESC); // Change the key that was held here, too!
+                if (e_sl_held && !e_sl_esc) {
+                    tap_code16(SE_SLSH);
                 }
+                e_sl_held = false;
             }
             return false; // We handled this keypress
         case CKC_C_BSP:
@@ -390,7 +407,6 @@ bool caps_word_press_user(uint16_t keycode) {
         case SE_ODIA:
         case SE_ADIA:
         case SE_ARNG:
-        case KC_MINS:
         case CKC_GH ... CKC_PH:
             add_weak_mods(MOD_BIT(KC_LSFT)); // Apply shift to next key.
             return true;
@@ -399,7 +415,7 @@ bool caps_word_press_user(uint16_t keycode) {
         case KC_1 ... KC_0:
         case KC_BSPC:
         case KC_DEL:
-        case KC_UNDS:
+        case SE_MINS: // Unshifted: custom shift keys would turn a shifted - into +.
         case SE_UNDS:
             return true;
 
