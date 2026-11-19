@@ -11,3 +11,4 @@ SRC += features/custom_shift_keys.c
 SPACE_CADET_ENABLE  = no
 GRAVE_ESC_ENABLE    = no
 MAGIC_ENABLE        = no
+OLED_ENABLE         = no
