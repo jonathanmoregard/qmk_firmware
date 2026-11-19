@@ -64,6 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 170
 
+#define RGB_MATRIX_TIMEOUT 1800000 // Lights off after 30 min without input; any key wakes them.
+#define SPLIT_ACTIVITY_ENABLE      // Right half sees left-half activity, so it times out in step.
+
 #define SPLIT_TRANSACTION_IDS_USER USER_SYNC_HINT // Miss hints light right-half keys too.
 
 #define LAYER_STATE_8BIT // 4 layers in use; 8-bit layer state saves flash
