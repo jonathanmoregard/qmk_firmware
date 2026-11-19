@@ -506,7 +506,7 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
     }
     if (keycode >= CKC_GH && keycode <= CKC_PH) { // H combo: used correctly, ends in h.
         train_hit(keycode - CKC_GH);
-        prev      = KC_H;
+        prev      = KC_NO; // Repeat would retype the whole combo, so a following h ("withhold") isn't a missed double.
         prev_time = record->event.time;
         return;
     }
