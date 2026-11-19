@@ -239,6 +239,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             SEND_STRING(SS_UP(X_LEFT_SHIFT) SS_UP(X_RIGHT_SHIFT) SS_TAP(X_H));
         }
     }
+    // Shift + % combo -> ~ (Swedish ~ is a dead key, so follow with space).
+    static bool tilde_sent = false;
+    if (keycode == SE_PERC) {
+        if (record->event.pressed && (get_mods() & MOD_MASK_SHIFT)) {
+            const uint8_t mods = get_mods();
+            del_weak_mods(MOD_MASK_SHIFT);
+            del_oneshot_mods(MOD_MASK_SHIFT);
+            unregister_mods(MOD_MASK_SHIFT);
+            tap_code16(SE_TILD);
+            tap_code(KC_SPC);
+            set_mods(mods);
+            tilde_sent = true;
+            return false;
+        }
+        if (!record->event.pressed && tilde_sent) {
+            tilde_sent = false; // Swallow release so held Shift isn't dropped.
+            return false;
+        }
+    }
+
     if (!process_custom_shift_keys(keycode, record)) {
         return false;
     }
