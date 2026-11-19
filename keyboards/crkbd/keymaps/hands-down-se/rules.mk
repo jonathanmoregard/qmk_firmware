@@ -12,3 +12,4 @@ SPACE_CADET_ENABLE  = no
 GRAVE_ESC_ENABLE    = no
 MAGIC_ENABLE        = no
 OLED_ENABLE         = no
+REPEAT_KEY_ENABLE = yes

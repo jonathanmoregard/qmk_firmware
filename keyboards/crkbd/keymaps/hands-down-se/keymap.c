@@ -243,12 +243,66 @@ static void send_h_bigram(uint16_t keycode) {
     }
 }
 
+// Adaptive keys (Hands Down style): rolling FIRST then TRIGGER within
+// ADAPTIVE_TERM types FIRST then OUTPUT, removing a same-finger pair or
+// scissor. Triggers are pairs that almost never occur in real text; type them
+// slower than ADAPTIVE_TERM to get the literal letters.
+#define ADAPTIVE_TERM 150
+
+typedef struct {
+    uint16_t first, trigger, output;
+} adaptive_key_t;
+
+static const adaptive_key_t adaptive_keys[] = {
+    {KC_A, KC_E, KC_U}, // ae -> au (same finger A/U); A+E chord is still Ä
+    {KC_P, KC_X, KC_L}, // px -> pl (scissor)
+    {KC_G, KC_X, KC_L}, // gx -> gl (scissor)
+    {KC_K, KC_C, KC_T}, // kc -> kt (same finger K/T)
+    {KC_N, KC_W, KC_L}, // nw -> nl (same finger N/L)
+};
+
+static uint16_t adaptive_prev      = KC_NO;
+static uint16_t adaptive_prev_time = 0;
+
+// Returns false if the press was replaced by an adaptive output.
+static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
+    if (!record->event.pressed || get_repeat_key_count()) return true;
+    uint16_t key = keycode;
+    if (IS_QK_MOD_TAP(keycode)) {
+        if (record->tap.count == 0) { // Held as a modifier, not a letter.
+            adaptive_prev = KC_NO;
+            return true;
+        }
+        key = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
+    }
+    const uint16_t prev    = adaptive_prev;
+    const bool     in_time = TIMER_DIFF_16(record->event.time, adaptive_prev_time) < ADAPTIVE_TERM;
+    adaptive_prev          = key;
+    adaptive_prev_time     = record->event.time;
+    if (!in_time || (get_mods() & ~MOD_MASK_SHIFT)) return true;
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(adaptive_keys); i++) {
+        if (adaptive_keys[i].first == prev && adaptive_keys[i].trigger == key) {
+            const uint16_t out = adaptive_keys[i].output;
+            tap_code16(is_caps_word_on() ? LSFT(out) : out);
+            set_last_keycode(out); // Repeat key repeats the output.
+            adaptive_prev = out;
+            return false;
+        }
+    }
+    return true;
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // On every key event, start or extend the deferred execution to call
     // `idle_callback()` after IDLE_TIMEOUT_MS.
     static deferred_token idle_token = INVALID_DEFERRED_TOKEN;
     if (!extend_deferred_exec(idle_token, IDLE_TIMEOUT_MS)) {
         idle_token = defer_exec(IDLE_TIMEOUT_MS, idle_callback, NULL);
+    }
+
+    if (!process_adaptive_key(keycode, record)) {
+        return false;
     }
 
     if (record->tap.count == 1 && !record->event.pressed) {
@@ -432,7 +486,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_VOLD, KC_W, KC_F, KC_L, KC_D, KC_V, KC_SCLN, KC_U, KC_O, KC_Y, KC_B, KC_BRID,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
-                                                                  KC_ENTER, KC_R, MO(1), KC_TAB, KC_SPACE, CKC_C_BSP
+                                                                  QK_REP, KC_R, MO(1), KC_HYPR, KC_SPACE, CKC_C_BSP
                                                                   //`--------------------------------------------'  `--------------------------------------------'
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
