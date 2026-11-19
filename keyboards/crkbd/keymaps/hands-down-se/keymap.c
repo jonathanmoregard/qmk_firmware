@@ -312,11 +312,6 @@ static const uint16_t missed_pairs[][2] = {
     {KC_T, KC_H}, {KC_C, KC_H}, {KC_S, KC_H}, {KC_W, KC_H}, {KC_P, KC_H}, {KC_G, KC_H}, // H combos
 };
 
-// Pairs never flagged. Doubles listed here won't ask for the Repeat key.
-static const uint16_t miss_exceptions[][2] = {
-    {KC_R, KC_R}, // R and Repeat share the left thumb, so Repeat doesn't help.
-};
-
 static bool is_letter(uint16_t key) {
     return (key >= KC_A && key <= KC_Z) || key == KC_LBRC || key == KC_QUOT || key == KC_SCLN; // + å ä ö
 }
@@ -418,10 +413,8 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
     prev = (is_letter(key) || key == KC_H) ? key : KC_NO;
     if (first == KC_NO || !recent || !is_letter(key)) return;
 
-    for (uint8_t i = 0; i < ARRAY_SIZE(miss_exceptions); i++) {
-        if (miss_exceptions[i][0] == first && miss_exceptions[i][1] == key) return;
-    }
-    bool missed = first == key; // A double that Repeat could have typed.
+    // Typed doubles (ll, rr, ...) are fine: Repeat is optional, never asked for.
+    bool missed = false;
     for (uint8_t i = 0; !missed && i < ARRAY_SIZE(missed_pairs); i++) {
         missed = missed_pairs[i][0] == first && missed_pairs[i][1] == key;
     }
