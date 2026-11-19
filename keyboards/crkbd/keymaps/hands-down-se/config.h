@@ -34,6 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define COMBO_TERM 30
 #define TAPPING_TERM 220
+// Home-row mods (see keymap.c for the per-key hooks):
+#define TAPPING_TERM_PER_KEY // Shift mod-taps settle faster (175 ms).
+#define PERMISSIVE_HOLD      // Tapping another key inside the hold = modifier, so a fast Shift isn't lost.
+#define CHORDAL_HOLD         // Only opposite-hand chords hold; same-hand rolls stay letters.
+#define FLOW_TAP_TERM 150    // A mod-tap pressed mid-burst is a letter (Shift excluded).
 
 #define BOTH_SHIFTS_TURNS_ON_CAPS_WORD
 

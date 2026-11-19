@@ -517,6 +517,44 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 };
 
+// --- Home-row mod tuning ---------------------------------------------------
+
+static bool is_shift_mod_tap(uint16_t keycode) {
+    return keycode == LSFT_T(KC_T) || keycode == RSFT_T(KC_A);
+}
+
+uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
+    return is_shift_mod_tap(keycode) ? 175 : TAPPING_TERM;
+}
+
+// Split board: the first half of the matrix rows is the left hand.
+char chordal_hold_handedness(keypos_t key) {
+    return key.row < MATRIX_ROWS / 2 ? 'L' : 'R';
+}
+
+// Letters (incl. å ä ö), space and punctuation count as "typing" for Flow Tap.
+static bool is_typing_key(uint16_t keycode) {
+    switch (get_tap_keycode(keycode)) {
+        case KC_SPC:
+        case KC_A ... KC_Z:
+        case KC_LBRC: // å
+        case KC_QUOT: // ä
+        case KC_SCLN: // ö
+        case KC_DOT:
+        case KC_COMM:
+        case KC_SLSH:
+            return true;
+    }
+    return false;
+}
+
+uint16_t get_flow_tap_term(uint16_t keycode, keyrecord_t *record, uint16_t prev_keycode) {
+    // Never for Shift: a capital right after a fast space must still work.
+    if (is_shift_mod_tap(keycode)) return 0;
+    if ((get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) != 0) return 0; // hotkeys
+    return is_typing_key(keycode) && is_typing_key(prev_keycode) ? FLOW_TAP_TERM : 0;
+}
+
 bool get_combo_must_tap(uint16_t index, combo_t *combo) {
     // All Mod-Tap/Layer-Tap/Momentary keys is tap-only
     uint16_t key;
