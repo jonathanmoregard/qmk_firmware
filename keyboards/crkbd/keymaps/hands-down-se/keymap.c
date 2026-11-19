@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "keymap_swedish.h"
 #include "raw_hid.h"
 
-enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME };
+enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME, CKC_MUTE };
 
 const custom_shift_key_t custom_shift_keys[] = {
     // single keys
@@ -198,6 +198,7 @@ void housekeeping_task_user(void) {
 // Underglow colour, first match wins: Caps Lock red, Caps Word orange-red,
 // then per layer: base green, numbers purple, nav blue, mouse teal.
 static bool miss_flashing = false; // A miss blink owns the LEDs until it ends.
+static bool miss_muted    = false; // CKC_MUTE: no blink or ting; base layer turns red.
 
 static void set_layer_color(uint8_t layer) {
     if (miss_flashing) return;
@@ -214,7 +215,7 @@ static void set_layer_color(uint8_t layer) {
         case 1: rgb_matrix_sethsv_noeeprom(191, 255, val); break; // purple
         case 2: rgb_matrix_sethsv_noeeprom(170, 255, val); break; // blue
         case 3: rgb_matrix_sethsv_noeeprom(128, 255, val); break; // teal
-        default: rgb_matrix_sethsv_noeeprom(85, 255, val); break; // green
+        default: rgb_matrix_sethsv_noeeprom(miss_muted ? 0 : 85, 255, val); break; // green, red when muted
     }
 }
 
@@ -320,6 +321,26 @@ static bool is_letter(uint16_t key) {
     return (key >= KC_A && key <= KC_Z) || key == KC_LBRC || key == KC_QUOT || key == KC_SCLN; // + å ä ö
 }
 
+// Left outer thumb: mute miss warnings (blink + host ting) for 30 minutes;
+// press again to unmute early.
+#define MISS_MUTE_MS (30UL * 60 * 1000)
+static deferred_token miss_mute_token = INVALID_DEFERRED_TOKEN;
+
+static uint32_t miss_mute_end(uint32_t trigger_time, void *cb_arg) {
+    miss_muted      = false;
+    miss_mute_token = INVALID_DEFERRED_TOKEN;
+    set_layer_color(get_highest_layer(layer_state));
+    return 0;
+}
+
+static void toggle_miss_mute(void) {
+    cancel_deferred_exec(miss_mute_token);
+    miss_mute_token = INVALID_DEFERRED_TOKEN;
+    miss_muted      = !miss_muted;
+    if (miss_muted) miss_mute_token = defer_exec(MISS_MUTE_MS, miss_mute_end, NULL);
+    set_layer_color(get_highest_layer(layer_state));
+}
+
 static uint32_t miss_flash_end(uint32_t trigger_time, void *cb_arg) {
     miss_flashing = false;
     set_layer_color(get_highest_layer(layer_state));
@@ -343,7 +364,7 @@ static void stats_flush(void) {
 static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return;
     if ((IS_QK_MOD_TAP(keycode) || IS_QK_LAYER_TAP(keycode)) && record->tap.count == 0) return; // held
-    if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR) return;
+    if (IS_QK_MOMENTARY(keycode) || IS_QK_TO(keycode) || keycode == KC_HYPR || keycode == CKC_MUTE) return;
     if (get_mods() & ~MOD_MASK_SHIFT) return; // shortcuts aren't typing
     if (keycode == CKC_C_BSP || keycode == KC_BSPC) {
         stat_bsp++;
@@ -355,7 +376,8 @@ static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
 
 static void flash_miss(void) {
     static deferred_token token = INVALID_DEFERRED_TOKEN;
-    stat_miss++;
+    stat_miss++; // Still counted while muted.
+    if (miss_muted) return;
     cancel_deferred_exec(token);
     miss_flashing = true;
     rgb_matrix_sethsv_noeeprom(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS); // red
@@ -413,7 +435,7 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
 
 // The tapped LT_REP must not become the "last key" itself.
 bool remember_last_key_user(uint16_t keycode, keyrecord_t *record, uint8_t *remembered_mods) {
-    return keycode != LT_REP;
+    return keycode != LT_REP && keycode != CKC_MUTE;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -493,6 +515,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case CKC_HOME:
             if (record->event.pressed) {
                 reset_keyboard_state();
+            }
+            return false;
+        case CKC_MUTE:
+            if (record->event.pressed) {
+                toggle_miss_mute();
             }
             return false;
         case CKC_E_SL:
@@ -661,7 +688,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_VOLD, KC_W, KC_F, KC_L, KC_D, KC_V, KC_SCLN, KC_U, KC_O, KC_Y, KC_B, KC_BRID,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
-                                                                  KC_NO, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
+                                                                  CKC_MUTE, KC_R, LT_REP, KC_HYPR, KC_SPACE, CKC_C_BSP
                                                                   //`--------------------------------------------'  `--------------------------------------------'
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
