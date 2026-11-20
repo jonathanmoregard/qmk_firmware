@@ -172,7 +172,18 @@ static void stats_flush(void);
 static void hint_sync(void);
 static void hint_slave_handler(uint8_t in_len, const void *in_data, uint8_t out_len, void *out_data);
 
+// A held key sends no events, so it looks idle. The matrix covers both halves.
+static bool any_key_held(void) {
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        if (matrix_get_row(row)) return true;
+    }
+    return false;
+}
+
 static uint32_t idle_callback(uint32_t trigger_time, void *cb_arg) {
+    // A long hold (e.g. right Ctrl as push-to-talk) isn't idle: check again later
+    // instead of releasing its mods.
+    if (any_key_held()) return IDLE_TIMEOUT_MS;
     // If execution reaches here, the keyboard has gone idle.
     reset_keyboard_state();
     stats_flush();
