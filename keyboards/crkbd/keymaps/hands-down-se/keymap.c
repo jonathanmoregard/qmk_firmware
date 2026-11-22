@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include QMK_KEYBOARD_H
 #include "features/custom_shift_keys.h"
 #include "keymap_swedish.h"
+#include "sendstring_swedish.h" // SEND_STRING for a Swedish host layout (: / -)
 #include "raw_hid.h"
 #include "transactions.h"
 #include <string.h>
 
 // CKC_GH..CKC_PH must stay in this order: the training scores index by it.
-enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME, CKC_WARN };
+enum custom_keycodes { CKC_GH = SAFE_RANGE, CKC_TH, CKC_CH, CKC_SH, CKC_WH, CKC_PH, CKC_C_BSP, CKC_E_SL, CKC_HOME, CKC_WARN, CKC_CAL_30M, CKC_CAL_1H, CKC_CAL_2H, CKC_CAL_HANG };
 
 // Left inner thumb: hold for layer 1, tap for Repeat. Repeat sits on the left
 // thumb (next to R), not beside Space, so words ending in a double letter
@@ -560,7 +561,8 @@ static void check_missed_shortcut(uint16_t keycode, keyrecord_t *record) {
 
 // The tapped LT_REP must not become the "last key" itself.
 bool remember_last_key_user(uint16_t keycode, keyrecord_t *record, uint8_t *remembered_mods) {
-    return keycode != LT_REP && keycode != CKC_WARN;
+    // Calendly links aren't remembered either: Repeat would retype the whole URL.
+    return keycode != LT_REP && keycode != CKC_WARN && !(keycode >= CKC_CAL_30M && keycode <= CKC_CAL_HANG);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -646,6 +648,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 warn_level = warn_level % LVL_REPEAT + 1; // 1 -> 2 -> 3 -> 1
             }
+            return false;
+        // Calendly booking links (layer 1, right bottom row). Source: Dropbox/Calendly/Booking-links.txt.
+        case CKC_CAL_30M:
+            if (record->event.pressed) SEND_STRING("https://calendly.com/jonathan-more/conversation-up-to-30min");
+            return false;
+        case CKC_CAL_1H:
+            if (record->event.pressed) SEND_STRING("https://calendly.com/jonathan-more/conversation-up-to-1h");
+            return false;
+        case CKC_CAL_2H:
+            if (record->event.pressed) SEND_STRING("https://calendly.com/jonathan-more/conversation-up-to-2h");
+            return false;
+        case CKC_CAL_HANG:
+            if (record->event.pressed) SEND_STRING("https://calendly.com/jonathan-more/hangout");
             return false;
         case CKC_E_SL:
             // Tap: /. Hold: Esc, sent by housekeeping_task_user as soon as
@@ -818,11 +833,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   ),
                                                               [1] = LAYOUT_split_3x6_3(
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
-                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_F2, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_F5, KC_TRNS, KC_TRNS, KC_TRNS,
+                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_F2, C(S(KC_F10)), KC_TRNS, KC_TRNS, KC_F12, KC_F5, KC_TRNS, KC_TRNS, KC_TRNS,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_TRNS, LGUI_T(KC_8), LALT_T(KC_9), LCTL_T(KC_2), LSFT_T(KC_3), KC_4, KC_5, RSFT_T(KC_1), RCTL_T(KC_0), RALT_T(KC_6), RGUI_T(KC_7), KC_TRNS,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
-                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
+                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, CKC_CAL_30M, CKC_CAL_1H, CKC_CAL_2H, CKC_CAL_HANG, KC_TRNS,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
                                                                   KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS
                                                                   //`--------------------------------------------'  `--------------------------------------------'
@@ -833,7 +848,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {[0] = LAYOUT_split
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
                                                                   KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_PAGE_DOWN, KC_LEFT, KC_DOWN, KC_RIGHT, KC_TRNS, KC_TRNS,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------|                                |--------------+--------------+--------------+---------------+--------------+--------------|
-                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
+                                                                  KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_F8, KC_TRNS, KC_TRNS, KC_TRNS,
                                                                   // |--------------+--------------+--------------+---------------+--------------+--------------+--------------|  |--------------+--------------+--------------+---------------+--------------+--------------+--------------|
                                                                   KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS
                                                                   //`--------------------------------------------'  `--------------------------------------------'
