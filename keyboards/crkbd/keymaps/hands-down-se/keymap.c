@@ -279,20 +279,20 @@ enum { LVL_COMBOS = 1, LVL_ROLLS, LVL_REPEAT }; // What warns, per CKC_WARN mode
 static uint8_t warn_level = LVL_COMBOS; // Boots red: only H combos warn.
 static void    train_hit(uint8_t item);
 
-// Adaptive keys (Hands Down style): rolling FIRST then TRIGGER within
-// ADAPTIVE_TERM types FIRST then OUTPUT, removing a same-finger pair or
+// Adaptive keys (Hands Down style): rolling FIRST then TRIGGER within the
+// entry's term (ms) types FIRST then OUTPUT, removing a same-finger pair or
 // scissor. Triggers are pairs that almost never occur in real text; type them
-// slower than ADAPTIVE_TERM to get the literal letters.
+// slower than the term to get the literal letters.
 #define ADAPTIVE_TERM 150
 
 typedef struct {
-    uint16_t first, trigger, output;
+    uint16_t first, trigger, output, term;
 } adaptive_key_t;
 
 static const adaptive_key_t adaptive_keys[] = {
-    {KC_A, KC_E, KC_U}, // ae -> au (same finger A/U); A+E chord is still Ä
-    {KC_P, KC_N, KC_L}, // pn -> pl (scissor); N, not a pinky key. Clash: fast "uppnå"
-    {KC_N, KC_W, KC_L}, // nw -> nl (same finger N/L)
+    {KC_A, KC_E, KC_U, ADAPTIVE_TERM}, // ae -> au (same finger A/U); A+E chord is still Ä
+    {KC_P, KC_N, KC_L, 225},           // pn -> pl (scissor); N, not a pinky key. Longer term: hard to roll fast. Clash: fast "uppnå"
+    {KC_N, KC_W, KC_L, ADAPTIVE_TERM}, // nw -> nl (same finger N/L)
 };
 
 static uint16_t adaptive_prev      = KC_NO;
@@ -310,13 +310,13 @@ static bool process_adaptive_key(uint16_t keycode, keyrecord_t *record) {
         key = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
     }
     const uint16_t prev    = adaptive_prev;
-    const bool     in_time = TIMER_DIFF_16(record->event.time, adaptive_prev_time) < ADAPTIVE_TERM;
+    const uint16_t elapsed = TIMER_DIFF_16(record->event.time, adaptive_prev_time);
     adaptive_prev          = key;
     adaptive_prev_time     = record->event.time;
-    if (!in_time || (get_mods() & ~MOD_MASK_SHIFT)) return true;
+    if (get_mods() & ~MOD_MASK_SHIFT) return true;
 
     for (uint8_t i = 0; i < ARRAY_SIZE(adaptive_keys); i++) {
-        if (adaptive_keys[i].first == prev && adaptive_keys[i].trigger == key) {
+        if (adaptive_keys[i].first == prev && adaptive_keys[i].trigger == key && elapsed < adaptive_keys[i].term) {
             const uint16_t out = adaptive_keys[i].output;
             train_hit(ROLL_BASE + i);
             tap_code16(is_caps_word_on() ? LSFT(out) : out);
