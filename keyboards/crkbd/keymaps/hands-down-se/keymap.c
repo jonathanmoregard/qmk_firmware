@@ -276,7 +276,7 @@ static void send_h_bigram(uint16_t keycode) {
 #define N_COMBOS 6
 #define ROLL_BASE N_COMBOS
 enum { LVL_COMBOS = 1, LVL_ROLLS, LVL_REPEAT }; // What warns, per CKC_WARN mode.
-static uint8_t warn_level = LVL_REPEAT;
+static uint8_t warn_level = LVL_COMBOS; // Boots red: only H combos warn.
 static void    train_hit(uint8_t item);
 
 // Adaptive keys (Hands Down style): rolling FIRST then TRIGGER within
@@ -291,7 +291,7 @@ typedef struct {
 
 static const adaptive_key_t adaptive_keys[] = {
     {KC_A, KC_E, KC_U}, // ae -> au (same finger A/U); A+E chord is still Ä
-    {KC_P, KC_X, KC_L}, // px -> pl (scissor)
+    {KC_P, KC_N, KC_L}, // pn -> pl (scissor); N, not a pinky key. Clash: fast "uppnå"
     {KC_N, KC_W, KC_L}, // nw -> nl (same finger N/L)
 };
 
@@ -358,7 +358,7 @@ static void count_keystroke(uint16_t keycode, keyrecord_t *record) {
 // Training hints: when a pair is typed the long way instead of with its
 // H combo, roll or the Repeat key, the keys that should have been used pulse
 // white for 3 s and the host plays a ting. Only the produced pair is checked,
-// so roll triggers (px, ae...) never warn.
+// so roll triggers (pn, ae...) never warn.
 // Lenient: every H combo, roll and letter (for doubles) keeps a score, +1 per
 // correct use and -1 per miss, and warns only while the score is below zero.
 // At most one warning a minute; scores reset every 24 h of uptime.
